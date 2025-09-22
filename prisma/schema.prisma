@@ -1,0 +1,93 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id             String   @id @default(cuid())
+  fullname       String
+  email          String   @unique
+  password       String
+  profilePicture String?
+  bio            String?
+  isVerified     Boolean  @default(false)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  // Self-referential many-to-many relationship for followers/following
+  followers User[] @relation("UserFollows")
+  following User[] @relation("UserFollows")
+
+  // Posts relationship
+  posts Post[]
+
+  // Likes relationship
+  likedPosts Post[] @relation("PostLikes")
+
+  // Shares relationship
+  sharedPosts Post[] @relation("PostShares")
+
+  // Comments relationship
+  comments Comment[]
+
+  // Comment likes relationship
+  likedComments Comment[] @relation("CommentLikes")
+
+  @@map("users")
+}
+
+model Post {
+  id         String   @id @default(cuid())
+  userId     String
+  content    String
+  visibility String   @default("public") // 'public', 'friends', 'private'
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  // Relationships
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  media    PostMedia[]
+  likes    User[]    @relation("PostLikes")
+  shares   User[]    @relation("PostShares")
+  comments Comment[]
+
+  @@map("posts")
+}
+
+model PostMedia {
+  id     String @id @default(cuid())
+  postId String
+  type   String // 'image', 'video'
+  url    String
+
+  // Relationships
+  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@map("post_media")
+}
+
+model Comment {
+  id             String    @id @default(cuid())
+  postId         String
+  userId         String
+  content        String
+  parentComment  String?   // For nested replies
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  // Relationships
+  post           Post      @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  parent         Comment?  @relation("CommentReplies", fields: [parentComment], references: [id], onDelete: Cascade)
+  replies        Comment[] @relation("CommentReplies")
+  likes          User[]    @relation("CommentLikes")
+
+  @@map("comments")
+}
