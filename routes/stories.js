@@ -3,10 +3,6 @@ const { PrismaClient } = require('@prisma/client');
 const { authenticateToken } = require('../middleware/auth');
 const { upload, handleUploadError } = require('../middleware/upload');
 const { body, param, validationResult } = require('express-validator');
-const sharp = require('sharp');
-const path = require('path');
-const fs = require('fs');
-const { v4: uuidv4 } = require('uuid');
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -32,46 +28,15 @@ const validateStoryId = [
   handleValidationErrors
 ];
 
-// Image processing middleware for stories
+// Simple image URL middleware for stories
 const processImages = async (req, res, next) => {
   if (!req.file) {
     return next();
   }
 
-  try {
-    const imagesDir = path.join(__dirname, '../public/uploads/images');
-    const inputPath = req.file.path;
-    const outputPath = path.join(imagesDir, `processed_${req.file.filename}`);
-
-    // Process image with sharp for stories (square format)
-    await sharp(inputPath)
-      .resize(800, 800, {
-        fit: 'cover',
-        position: 'center'
-      })
-      .jpeg({ quality: 85 })
-      .toFile(outputPath);
-
-    // Remove original file
-    fs.unlinkSync(inputPath);
-
-    // Update file info
-    req.file.filename = `processed_${req.file.filename}`;
-    req.file.path = outputPath;
-    req.file.url = `/uploads/images/${req.file.filename}`;
-
-    next();
-  } catch (error) {
-    console.error('Image processing error:', error);
-    // Clean up uploaded file on error
-    if (req.file && fs.existsSync(req.file.path)) {
-      fs.unlinkSync(req.file.path);
-    }
-    res.status(500).json({
-      status: 'error',
-      message: 'Failed to process image'
-    });
-  }
+  // Just set the URL for the uploaded file
+  req.file.url = `/uploads/images/${req.file.filename}`;
+  next();
 };
 
 /**

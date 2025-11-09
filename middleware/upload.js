@@ -1,6 +1,5 @@
 const multer = require('multer');
 const path = require('path');
-const sharp = require('sharp');
 const { v4: uuidv4 } = require('uuid');
 const fs = require('fs');
 
@@ -50,56 +49,20 @@ const upload = multer({
   }
 });
 
-// Image processing middleware
+// Simple image URL middleware
 const processImages = async (req, res, next) => {
   if (!req.files || req.files.length === 0) {
     return next();
   }
 
-  try {
-    const processedFiles = [];
+  // Just set URLs for uploaded files
+  const processedFiles = req.files.map(file => {
+    file.url = `/uploads/images/${file.filename}`;
+    return file;
+  });
 
-    for (const file of req.files) {
-      const inputPath = file.path;
-      const outputPath = path.join(imagesDir, `processed_${file.filename}`);
-      
-      // Process image with sharp
-      await sharp(inputPath)
-        .resize(1200, 1200, { 
-          fit: 'inside',
-          withoutEnlargement: true 
-        })
-        .jpeg({ quality: 85 })
-        .toFile(outputPath);
-
-      // Remove original file
-      fs.unlinkSync(inputPath);
-      
-      // Update file info
-      file.filename = `processed_${file.filename}`;
-      file.path = outputPath;
-      file.url = `/uploads/images/${file.filename}`;
-      
-      processedFiles.push(file);
-    }
-
-    req.files = processedFiles;
-    next();
-  } catch (error) {
-    console.error('Image processing error:', error);
-    // Clean up uploaded files on error
-    if (req.files) {
-      req.files.forEach(file => {
-        if (fs.existsSync(file.path)) {
-          fs.unlinkSync(file.path);
-        }
-      });
-    }
-    res.status(500).json({
-      status: 'error',
-      message: 'Failed to process images'
-    });
-  }
+  req.files = processedFiles;
+  next();
 };
 
 // Error handling middleware for multer

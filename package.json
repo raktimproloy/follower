@@ -35,7 +35,6 @@
     "mysql2": "^3.6.5",
     "nodemailer": "^7.0.10",
     "prisma": "^5.7.1",
-    "sharp": "^0.33.0",
     "uuid": "^9.0.1"
   },
   "devDependencies": {
