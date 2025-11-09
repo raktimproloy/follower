@@ -413,4 +413,111 @@ router.get('/following/:id', validateUserId, async (req, res) => {
   }
 });
 
+/**
+ * @route   GET /api/users/posts
+ * @desc    Get current user's own posts with pagination
+ * @access  Private
+ */
+router.get('/posts', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const skip = (page - 1) * limit;
+
+    // Get posts with media, likes count, comments count, and shares count
+    const posts = await prisma.post.findMany({
+      where: { userId },
+      include: {
+        media: true,
+        user: {
+          select: {
+            id: true,
+            fullname: true,
+            profilePicture: true,
+            isVerified: true
+          }
+        },
+        _count: {
+          select: {
+            likes: true,
+            comments: true,
+            shares: true
+          }
+        }
+      },
+      skip,
+      take: limit,
+      orderBy: {
+        createdAt: 'desc'
+      }
+    });
+
+    // Get total count of user's posts
+    const totalPosts = await prisma.post.count({
+      where: { userId }
+    });
+
+    // Transform posts to include like/share status for current user
+    const transformedPosts = await Promise.all(
+      posts.map(async (post) => {
+        const isLiked = await prisma.post.findFirst({
+          where: {
+            id: post.id,
+            likes: {
+              some: { id: userId }
+            }
+          }
+        });
+
+        const isShared = await prisma.post.findFirst({
+          where: {
+            id: post.id,
+            shares: {
+              some: { id: userId }
+            }
+          }
+        });
+
+        return {
+          id: post.id,
+          content: post.content,
+          visibility: post.visibility,
+          createdAt: post.createdAt,
+          updatedAt: post.updatedAt,
+          user: post.user,
+          media: post.media,
+          stats: {
+            likesCount: post._count.likes,
+            commentsCount: post._count.comments,
+            sharesCount: post._count.shares
+          },
+          isLiked: !!isLiked,
+          isShared: !!isShared
+        };
+      })
+    );
+
+    res.status(200).json({
+      status: 'success',
+      data: {
+        posts: transformedPosts,
+        pagination: {
+          page,
+          limit,
+          total: totalPosts,
+          pages: Math.ceil(totalPosts / limit)
+        }
+      }
+    });
+
+  } catch (error) {
+    console.error('Get user posts error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to get user posts'
+    });
+  }
+});
+
 module.exports = router;

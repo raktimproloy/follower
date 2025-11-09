@@ -224,12 +224,157 @@ router.get('/', optionalAuth, async (req, res) => {
   }
 });
 
+
+/**
+ * @route   GET /api/posts/following
+ * @desc    Get posts from users that the current user is following
+ * @access  Private
+ */
+router.get('/following', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 20;
+    const skip = (page - 1) * limit;
+
+    // Get users that the current user is following
+    const userFollowing = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { following: { select: { id: true } } }
+    });
+
+    if (!userFollowing || userFollowing.following.length === 0) {
+      return res.status(200).json({
+        status: 'success',
+        data: {
+          posts: [],
+          pagination: {
+            page,
+            limit,
+            total: 0,
+            pages: 0
+          }
+        }
+      });
+    }
+
+    const followingIds = userFollowing.following.map(user => user.id);
+
+    // Get posts from followed users with public or friends visibility
+    const posts = await prisma.post.findMany({
+      where: {
+        userId: { in: followingIds },
+        OR: [
+          { visibility: 'public' },
+          { visibility: 'friends' }
+        ]
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            fullname: true,
+            profilePicture: true,
+            isVerified: true
+          }
+        },
+        media: true,
+        _count: {
+          select: {
+            likes: true,
+            comments: {
+              where: { parentComment: null }
+            },
+            shares: true
+          }
+        }
+      },
+      orderBy: {
+        createdAt: 'desc'
+      },
+      skip,
+      take: limit
+    });
+
+    // Get total count
+    const totalPosts = await prisma.post.count({
+      where: {
+        userId: { in: followingIds },
+        OR: [
+          { visibility: 'public' },
+          { visibility: 'friends' }
+        ]
+      }
+    });
+
+    // Transform posts to include like/share status for current user
+    const transformedPosts = await Promise.all(
+      posts.map(async (post) => {
+        const isLiked = await prisma.post.findFirst({
+          where: {
+            id: post.id,
+            likes: {
+              some: { id: userId }
+            }
+          }
+        });
+
+        const isShared = await prisma.post.findFirst({
+          where: {
+            id: post.id,
+            shares: {
+              some: { id: userId }
+            }
+          }
+        });
+
+        return {
+          id: post.id,
+          content: post.content,
+          visibility: post.visibility,
+          createdAt: post.createdAt,
+          updatedAt: post.updatedAt,
+          user: post.user,
+          media: post.media,
+          stats: {
+            likesCount: post._count.likes,
+            commentsCount: post._count.comments,
+            sharesCount: post._count.shares
+          },
+          isLiked: !!isLiked,
+          isShared: !!isShared
+        };
+      })
+    );
+
+    res.status(200).json({
+      status: 'success',
+      data: {
+        posts: transformedPosts,
+        pagination: {
+          page,
+          limit,
+          total: totalPosts,
+          pages: Math.ceil(totalPosts / limit)
+        }
+      }
+    });
+
+  } catch (error) {
+    console.error('Get following posts error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to get following posts'
+    });
+  }
+});
+
 /**
  * @route   GET /api/posts/:id
  * @desc    Get single post
  * @access  Public (with optional auth for like status)
  */
-router.get('/:id', validatePostId, optionalAuth, async (req, res) => {
+router.get('/search/:id', validatePostId, optionalAuth, async (req, res) => {
   try {
     const { id } = req.params;
     const currentUserId = req.user?.id;
@@ -551,5 +696,6 @@ router.post('/:id/share', authenticateToken, validatePostId, async (req, res) =>
     });
   }
 });
+
 
 module.exports = router;

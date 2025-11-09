@@ -18,6 +18,10 @@ model User {
   profilePicture String?
   bio            String?
   isVerified     Boolean  @default(false)
+  otpCode        String?
+  otpType        String?
+  otpExpiresAt   DateTime?
+  otpUsed        Boolean  @default(false)
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
@@ -39,6 +43,12 @@ model User {
 
   // Comment likes relationship
   likedComments Comment[] @relation("CommentLikes")
+
+  // Stories relationship
+  stories Story[]
+
+  // Story likes relationship
+  likedStories Story[] @relation("StoryLikes")
 
   @@map("users")
 }
@@ -80,7 +90,7 @@ model Comment {
   content        String
   parentComment  String?   // For nested replies
   createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
+  updatedAt      DateTime @updatedAt
 
   // Relationships
   post           Post      @relation(fields: [postId], references: [id], onDelete: Cascade)
@@ -91,3 +101,19 @@ model Comment {
 
   @@map("comments")
 }
+
+model Story {
+  id        String   @id @default(cuid())
+  userId    String
+  imageUrl  String
+  createdAt DateTime @default(now())
+  expiresAt DateTime // Expires after 24 hours
+
+  // Relationships
+  user  User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  likes User[] @relation("StoryLikes")
+
+  @@map("stories")
+}
+
+

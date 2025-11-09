@@ -8,6 +8,7 @@ const authRoutes = require('./routes/auth');
 const userRoutes = require('./routes/users');
 const postRoutes = require('./routes/posts');
 const commentRoutes = require('./routes/comments');
+const storyRoutes = require('./routes/stories');
 
 const app = express();
 const PORT = 5000;
@@ -40,6 +41,7 @@ app.use('/uploads', express.static('public/uploads'));
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/posts', postRoutes);
+app.use('/api/stories', storyRoutes);
 app.use('/api', commentRoutes);
 
 // Health check endpoint
