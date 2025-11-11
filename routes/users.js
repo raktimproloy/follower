@@ -520,4 +520,115 @@ router.get('/posts', authenticateToken, async (req, res) => {
   }
 });
 
+/**
+ * @route   GET /api/users/search
+ * @desc    Search users by name and email
+ * @access  Public
+ */
+router.get('/search', async (req, res) => {
+  try {
+    const { name, email } = req.query;
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 20;
+    const skip = (page - 1) * limit;
+
+    if ((!name || name.trim().length === 0) && (!email || email.trim().length === 0)) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'At least one search parameter (name or email) is required'
+      });
+    }
+
+    // Build where clause for name and email search
+    const whereClause = {};
+
+    if (name && name.trim().length > 0) {
+      whereClause.fullname = {
+        contains: name.trim()
+      };
+    }
+
+    if (email && email.trim().length > 0) {
+      whereClause.email = {
+        contains: email.trim()
+      };
+    }
+
+    // If both name and email are provided, use AND logic
+    if (name && email) {
+      whereClause.AND = [
+        { fullname: { contains: name.trim() } },
+        { email: { contains: email.trim() } }
+      ];
+      delete whereClause.fullname;
+      delete whereClause.email;
+    }
+
+    // Get users with pagination
+    const users = await prisma.user.findMany({
+      where: whereClause,
+      select: {
+        id: true,
+        fullname: true,
+        email: true,
+        profilePicture: true,
+        bio: true,
+        isVerified: true,
+        createdAt: true,
+        updatedAt: true,
+        _count: {
+          select: {
+            followers: true,
+            following: true
+          }
+        }
+      },
+      orderBy: {
+        createdAt: 'desc'
+      },
+      skip,
+      take: limit
+    });
+
+    // Get total count
+    const totalUsers = await prisma.user.count({
+      where: whereClause
+    });
+
+    // Transform users to include follower/following counts
+    const transformedUsers = users.map(user => ({
+      id: user.id,
+      fullname: user.fullname,
+      email: user.email,
+      profilePicture: user.profilePicture,
+      bio: user.bio,
+      isVerified: user.isVerified,
+      createdAt: user.createdAt,
+      updatedAt: user.updatedAt,
+      followersCount: user._count.followers,
+      followingCount: user._count.following
+    }));
+
+    res.status(200).json({
+      status: 'success',
+      data: {
+        users: transformedUsers,
+        pagination: {
+          page,
+          limit,
+          total: totalUsers,
+          pages: Math.ceil(totalUsers / limit)
+        }
+      }
+    });
+
+  } catch (error) {
+    console.error('Search users error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to search users'
+    });
+  }
+});
+
 module.exports = router;

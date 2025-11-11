@@ -374,7 +374,7 @@ router.get('/following', authenticateToken, async (req, res) => {
  * @desc    Get single post
  * @access  Public (with optional auth for like status)
  */
-router.get('/search/:id', validatePostId, optionalAuth, async (req, res) => {
+router.get('/get/:id', validatePostId, optionalAuth, async (req, res) => {
   try {
     const { id } = req.params;
     const currentUserId = req.user?.id;
@@ -693,6 +693,135 @@ router.post('/:id/share', authenticateToken, validatePostId, async (req, res) =>
     res.status(500).json({
       status: 'error',
       message: 'Failed to share post'
+    });
+  }
+});
+
+/**
+ * @route   GET /api/posts/search
+ * @desc    Search posts by content
+ * @access  Public (with optional auth for like status)
+ */
+router.get('/search', optionalAuth, async (req, res) => {
+  try {
+    const { q } = req.query;
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 20;
+    const skip = (page - 1) * limit;
+    const currentUserId = req.user?.id;
+
+    if (!q || q.trim().length === 0) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Search query is required'
+      });
+    }
+
+    // Build where clause for content search
+    const whereClause = {
+      content: {
+        contains: q.trim()
+      },
+      visibility: 'public'
+    };
+
+    // If user is authenticated, include their posts and friends' posts
+    if (currentUserId) {
+      const userFollowing = await prisma.user.findUnique({
+        where: { id: currentUserId },
+        select: { following: { select: { id: true } } }
+      });
+
+      const followingIds = userFollowing?.following.map(user => user.id) || [];
+
+      whereClause.OR = [
+        { visibility: 'public' },
+        { userId: currentUserId },
+        {
+          AND: [
+            { visibility: 'friends' },
+            { userId: { in: followingIds } }
+          ]
+        }
+      ];
+      delete whereClause.visibility;
+    }
+
+    // Get posts with pagination
+    const posts = await prisma.post.findMany({
+      where: whereClause,
+      include: {
+        user: {
+          select: {
+            id: true,
+            fullname: true,
+            profilePicture: true,
+            isVerified: true
+          }
+        },
+        media: true,
+        _count: {
+          select: {
+            likes: true,
+            shares: true
+          }
+        }
+      },
+      orderBy: {
+        createdAt: 'desc'
+      },
+      skip,
+      take: limit
+    });
+
+    // Check if current user liked each post
+    const postsWithLikes = await Promise.all(
+      posts.map(async (post) => {
+        let isLiked = false;
+        if (currentUserId) {
+          const like = await prisma.post.findFirst({
+            where: {
+              id: post.id,
+              likes: {
+                some: { id: currentUserId }
+              }
+            }
+          });
+          isLiked = !!like;
+        }
+
+        return {
+          ...post,
+          likesCount: post._count.likes,
+          sharesCount: post._count.shares,
+          isLiked
+        };
+      })
+    );
+
+    // Get total count
+    const totalPosts = await prisma.post.count({
+      where: whereClause
+    });
+
+    res.status(200).json({
+      status: 'success',
+      data: {
+        posts: postsWithLikes,
+        pagination: {
+          page,
+          limit,
+          total: totalPosts,
+          pages: Math.ceil(totalPosts / limit)
+        }
+      }
+    });
+
+  } catch (error) {
+    console.error('Search posts error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to search posts'
     });
   }
 });

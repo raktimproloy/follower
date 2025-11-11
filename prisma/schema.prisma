@@ -50,6 +50,12 @@ model User {
   // Story likes relationship
   likedStories Story[] @relation("StoryLikes")
 
+  // Story views relationship
+  viewedStories Story[] @relation("StoryViews")
+
+  // Notifications relationship
+  notifications Notification[]
+
   @@map("users")
 }
 
@@ -112,8 +118,23 @@ model Story {
   // Relationships
   user  User   @relation(fields: [userId], references: [id], onDelete: Cascade)
   likes User[] @relation("StoryLikes")
+  views User[] @relation("StoryViews")
 
   @@map("stories")
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  type      String   // 'like', 'comment', 'follow', 'share', 'story_like', 'story_view'
+  message   String
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  // Relationships
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("notifications")
 }
 
 

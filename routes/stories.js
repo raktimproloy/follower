@@ -75,7 +75,8 @@ router.post('/', authenticateToken, upload.single('image'), processImages, handl
         },
         _count: {
           select: {
-            likes: true
+            likes: true,
+            views: true
           }
         }
       }
@@ -87,7 +88,8 @@ router.post('/', authenticateToken, upload.single('image'), processImages, handl
       data: {
         story: {
           ...story,
-          likesCount: story._count.likes
+          likesCount: story._count.likes,
+          viewsCount: story._count.views
         }
       }
     });
@@ -97,6 +99,71 @@ router.post('/', authenticateToken, upload.single('image'), processImages, handl
     res.status(500).json({
       status: 'error',
       message: 'Failed to create story'
+    });
+  }
+});
+
+/**
+ * @route   POST /api/stories/:id/view
+ * @desc    Add view to story (only if not already viewed)
+ * @access  Private
+ */
+router.post('/:id/view', authenticateToken, validateStoryId, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user.id;
+
+    // Check if story exists
+    const story = await prisma.story.findUnique({
+      where: { id }
+    });
+
+    if (!story) {
+      return res.status(404).json({
+        status: 'error',
+        message: 'Story not found'
+      });
+    }
+
+    // Check if user already viewed the story
+    const existingView = await prisma.story.findFirst({
+      where: {
+        id,
+        views: {
+          some: { id: userId }
+        }
+      }
+    });
+
+    if (existingView) {
+      return res.status(200).json({
+        status: 'success',
+        message: 'Story already viewed',
+        action: 'already_viewed'
+      });
+    }
+
+    // Add view to the story
+    await prisma.story.update({
+      where: { id },
+      data: {
+        views: {
+          connect: { id: userId }
+        }
+      }
+    });
+
+    res.status(200).json({
+      status: 'success',
+      message: 'Story viewed successfully',
+      action: 'viewed'
+    });
+
+  } catch (error) {
+    console.error('View story error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to view story'
     });
   }
 });
@@ -136,12 +203,12 @@ router.get('/following', authenticateToken, async (req, res) => {
 
     const followingIds = userFollowing.following.map(user => user.id);
 
-    // Get active stories (not expired) from followed users
+    // Get stories uploaded within the last 24 hours from followed users
     const stories = await prisma.story.findMany({
       where: {
         userId: { in: followingIds },
-        expiresAt: {
-          gt: new Date()
+        createdAt: {
+          gt: new Date(Date.now() - 24 * 60 * 60 * 1000)
         }
       },
       include: {
@@ -155,7 +222,8 @@ router.get('/following', authenticateToken, async (req, res) => {
         },
         _count: {
           select: {
-            likes: true
+            likes: true,
+            views: true
           }
         }
       },
@@ -170,8 +238,8 @@ router.get('/following', authenticateToken, async (req, res) => {
     const totalStories = await prisma.story.count({
       where: {
         userId: { in: followingIds },
-        expiresAt: {
-          gt: new Date()
+        createdAt: {
+          gt: new Date(Date.now() - 24 * 60 * 60 * 1000)
         }
       }
     });
@@ -195,7 +263,8 @@ router.get('/following', authenticateToken, async (req, res) => {
           expiresAt: story.expiresAt,
           user: story.user,
           stats: {
-            likesCount: story._count.likes
+            likesCount: story._count.likes,
+            viewsCount: story._count.views
           },
           isLiked: !!isLiked
         };
@@ -243,7 +312,8 @@ router.get('/my', authenticateToken, async (req, res) => {
       include: {
         _count: {
           select: {
-            likes: true
+            likes: true,
+            views: true
           }
         }
       },
@@ -261,7 +331,8 @@ router.get('/my', authenticateToken, async (req, res) => {
           createdAt: story.createdAt,
           expiresAt: story.expiresAt,
           stats: {
-            likesCount: story._count.likes
+            likesCount: story._count.likes,
+            viewsCount: story._count.views
           }
         }))
       }
@@ -325,7 +396,8 @@ router.put('/:id', authenticateToken, validateStoryId, upload.single('image'), p
         },
         _count: {
           select: {
-            likes: true
+            likes: true,
+            views: true
           }
         }
       }
@@ -337,7 +409,8 @@ router.put('/:id', authenticateToken, validateStoryId, upload.single('image'), p
       data: {
         story: {
           ...updatedStory,
-          likesCount: updatedStory._count.likes
+          likesCount: updatedStory._count.likes,
+          viewsCount: updatedStory._count.views
         }
       }
     });

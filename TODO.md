@@ -1,5 +1,6 @@
-# TODO List for Updating Register and Login APIs
+# TODO List for Adding Search APIs
 
-- [x] Update `/register/initiate` endpoint in `routes/auth.js` to handle user existence checks and OTP sending based on verification status
-- [x] Update `/login` endpoint in `routes/auth.js` to handle user existence, verification status, and OTP sending if not verified
-- [x] Add debug logging in register, login, and OTP functions
+## Tasks
+- [ ] Add GET /api/posts/search endpoint in routes/posts.js to search posts by content with pagination
+- [ ] Add GET /api/users/search endpoint in routes/users.js to search users by name and email with pagination
+- [ ] Test the new endpoints by running the server and making sample requests
