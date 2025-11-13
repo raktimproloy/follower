@@ -87,7 +87,7 @@ router.get('/profile/:id', validateUserId, optionalAuth, async (req, res) => {
  */
 router.put('/profile', authenticateToken, validateProfileUpdate, async (req, res) => {
   try {
-    const { fullname, bio, profilePicture } = req.body;
+    const { fullname, bio, profilePicture, address, mobile } = req.body;
     const userId = req.user.id;
 
     // Update user profile
@@ -96,7 +96,9 @@ router.put('/profile', authenticateToken, validateProfileUpdate, async (req, res
       data: {
         ...(fullname && { fullname }),
         ...(bio !== undefined && { bio }),
-        ...(profilePicture !== undefined && { profilePicture })
+        ...(profilePicture !== undefined && { profilePicture }),
+        ...(address !== undefined && { address }),
+        ...(mobile !== undefined && { mobile })
       },
       select: {
         id: true,
@@ -104,6 +106,8 @@ router.put('/profile', authenticateToken, validateProfileUpdate, async (req, res
         email: true,
         profilePicture: true,
         bio: true,
+        address: true,
+        mobile: true,
         isVerified: true,
         createdAt: true,
         updatedAt: true
@@ -414,13 +418,13 @@ router.get('/following/:id', validateUserId, async (req, res) => {
 });
 
 /**
- * @route   GET /api/users/posts
- * @desc    Get current user's own posts with pagination
+ * @route   GET /api/users/posts/:userId?
+ * @desc    Get user's posts by ID with pagination (defaults to current user if no userId provided)
  * @access  Private
  */
-router.get('/posts', authenticateToken, async (req, res) => {
+router.get('/posts/:userId?', authenticateToken, async (req, res) => {
   try {
-    const userId = req.user.id;
+    const userId = req.params.userId || req.user.id;
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
     const skip = (page - 1) * limit;

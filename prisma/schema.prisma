@@ -17,6 +17,8 @@ model User {
   password       String
   profilePicture String?
   bio            String?
+  address        String?
+  mobile         String?
   isVerified     Boolean  @default(false)
   otpCode        String?
   otpType        String?

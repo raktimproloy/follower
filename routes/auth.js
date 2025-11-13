@@ -87,6 +87,62 @@ router.post('/register/initiate', async (req, res) => {
 });
 
 /**
+ * @route   POST /api/auth/register/resend-otp
+ * @desc    Resend OTP for registration
+ * @access  Public
+ */
+router.post('/register/resend-otp', async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    // Validate required fields
+    if (!email) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Email is required'
+      });
+    }
+
+    // Check if user exists
+    const user = await prisma.user.findUnique({
+      where: { email }
+    });
+
+    if (!user) {
+      return res.status(404).json({
+        status: 'error',
+        message: 'User not found'
+      });
+    }
+
+    // Check if user is already verified
+    if (user.isVerified) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'User is already verified'
+      });
+    }
+
+    // Generate and send new OTP
+    const otp = generateOTP();
+    await storeOTP(email, otp, 'registration');
+    await sendOTP(email, otp, 'registration');
+
+    res.status(200).json({
+      status: 'success',
+      message: 'OTP resent to your email. Please verify to complete registration.'
+    });
+
+  } catch (error) {
+    console.error('Resend OTP error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to resend OTP'
+    });
+  }
+});
+
+/**
  * @route   POST /api/auth/register/verify
  * @desc    Verify OTP and complete registration
  * @access  Public

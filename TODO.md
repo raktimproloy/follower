@@ -1,6 +1,7 @@
-# TODO List for Adding Search APIs
+# TODO List for Updating User Model and Routes
 
 ## Tasks
-- [ ] Add GET /api/posts/search endpoint in routes/posts.js to search posts by content with pagination
-- [ ] Add GET /api/users/search endpoint in routes/users.js to search users by name and email with pagination
-- [ ] Test the new endpoints by running the server and making sample requests
+- [x] Add 'address' and 'mobile' fields to User model in prisma/schema.prisma
+- [ ] Run Prisma migration to apply schema changes
+- [x] Update user update route in routes/users.js to handle address and mobile fields
+- [ ] Test the updated user update endpoint

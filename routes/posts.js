@@ -22,10 +22,6 @@ const handleValidationErrors = (req, res, next) => {
 
 // Validation rules
 const validatePost = [
-  body('content')
-    .isLength({ min: 1, max: 2000 })
-    .withMessage('Content must be between 1 and 2000 characters'),
-  
   body('visibility')
     .optional()
     .isIn(['public', 'friends', 'private'])
